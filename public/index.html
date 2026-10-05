@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebClip · 网页转 Markdown</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --panel-2: #1e222b;
+        --border: #2a2f3a;
+        --text: #e6e8ee;
+        --muted: #9aa3b2;
+        --accent: #4f8cff;
+        --accent-2: #22c55e;
+        --danger: #ef4444;
+        --radius: 12px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: radial-gradient(1200px 600px at 20% -10%, #1b2333 0%, var(--bg) 55%);
+        color: var(--text);
+        font: 15px/1.65 -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        min-height: 100vh;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px 80px; }
+      header.top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+      header.top h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+      .badge { font-size: 12px; color: var(--muted); border: 1px solid var(--border); padding: 2px 8px; border-radius: 999px; }
+      .badge.ok { color: var(--accent-2); border-color: #1d3b2a; background: #12241a; }
+      .badge.err { color: var(--danger); border-color: #3d1d1d; background: #241414; }
+      p.sub { color: var(--muted); margin: 8px 0 24px; }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 18px; }
+      .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      input[type="text"], input[type="url"], input[type="password"], select, textarea {
+        background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+        border-radius: 8px; padding: 10px 12px; font: inherit; outline: none; width: 100%;
+      }
+      input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+      #url { flex: 1 1 380px; }
+      button {
+        background: var(--accent); color: #08111f; border: 0; border-radius: 8px;
+        padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+      }
+      button:hover { filter: brightness(1.08); }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      button.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+      details.options { margin-top: 12px; }
+      details.options summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+      .optgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+      .optgrid label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+      .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+      .check input { width: auto; }
+      .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin-bottom: 14px; flex-wrap: wrap; }
+      .tabs button { background: transparent; color: var(--muted); border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 12px; font-weight: 500; }
+      .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+      pre, code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+      pre.box {
+        background: #0b0d12; border: 1px solid var(--border); border-radius: 8px;
+        padding: 14px; overflow: auto; max-height: 560px; font-size: 13px; white-space: pre-wrap; word-break: break-word;
+      }
+      .md-preview { max-height: 620px; overflow: auto; padding-right: 6px; }
+      .md-preview img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); background: #000; }
+      .md-preview video, .md-preview audio { max-width: 100%; border-radius: 8px; background: #000; display: block; margin: 10px 0; }
+      .md-preview audio { background: transparent; }
+      .md-preview pre { background: #0b0d12; border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow: auto; }
+      .md-preview blockquote { border-left: 3px solid var(--border); margin: 0; padding-left: 14px; color: var(--muted); }
+      .md-preview h1, .md-preview h2, .md-preview h3 { line-height: 1.3; }
+      .md-preview table { border-collapse: collapse; width: 100%; font-size: 14px; }
+      .md-preview th, .md-preview td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+      .mediagrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+      .mediagrid figure { margin: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+      .mediagrid img { width: 100%; height: 110px; object-fit: cover; display: block; background: #000; }
+      .mediagrid figcaption { font-size: 11px; color: var(--muted); padding: 6px; word-break: break-all; }
+      .stats { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+      .stats b { color: var(--text); font-weight: 600; }
+      .warn { color: #fbbf24; font-size: 13px; }
+      .err { color: var(--danger); white-space: pre-wrap; }
+      .list-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
+      .list-item:last-child { border-bottom: 0; }
+      .list-item .meta { color: var(--muted); font-size: 12px; }
+      .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #ffffff44; border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .hidden { display: none !important; }
+      .danger-link { color: #f87171; }
+      .danger-link:hover { text-decoration: underline; }
+
+      /* ---- 顶部视图切换 ---- */
+      .viewtabs { display: flex; gap: 8px; margin: 0 0 22px; flex-wrap: wrap; }
+      .viewtabs button {
+        background: transparent; color: var(--muted); border: 1px solid var(--border);
+        border-radius: 999px; padding: 7px 18px; font-weight: 500;
+      }
+      .viewtabs button.active { color: #08111f; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+      .viewtabs button:hover:not(.active) { color: var(--text); border-color: var(--accent); }
+
+      /* ---- API 测试 ---- */
+      .api-grid { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 18px; align-items: start; }
+      @media (max-width: 900px) { .api-grid { grid-template-columns: 1fr; } }
+      .endpoint-group { font-size: 11px; color: var(--muted); letter-spacing: .5px; margin: 10px 0 4px; }
+      .endpoint-list { display: flex; flex-direction: column; gap: 5px; max-height: 420px; overflow: auto; padding-right: 4px; }
+      .endpoint-item {
+        display: flex; gap: 8px; align-items: center; padding: 7px 10px;
+        border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+        font-size: 13px; background: var(--panel-2);
+      }
+      .endpoint-item:hover { border-color: var(--accent); }
+      .endpoint-item.active { border-color: var(--accent); background: #16233a; }
+      .endpoint-item code { font-size: 12px; }
+      .endpoint-item .desc { color: var(--muted); font-size: 11px; margin-left: auto; white-space: nowrap; }
+      .method { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: .4px; }
+      .method.GET { background: #12351f; color: #4ade80; }
+      .method.POST { background: #132a45; color: #60a5fa; }
+      .method.DELETE { background: #3a1620; color: #f87171; }
+      .field-row { display: grid; grid-template-columns: 148px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+      .field-row > label { font-size: 12px; color: var(--muted); word-break: break-all; }
+      .field-row input[type="text"], .field-row input[type="number"], .field-row select { padding: 7px 9px; font-size: 13px; }
+      .status-pill { font-weight: 700; padding: 2px 10px; border-radius: 999px; font-size: 12px; }
+      .status-pill.ok { background: #12241a; color: #4ade80; }
+      .status-pill.bad { background: #241414; color: #f87171; }
+      .kv { color: var(--muted); font-size: 12px; }
+      .hist { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow: auto; }
+      .hist-item {
+        display: flex; justify-content: space-between; gap: 10px; font-size: 12px;
+        padding: 6px 9px; border-radius: 6px; background: var(--panel-2); cursor: pointer;
+      }
+      .hist-item:hover { background: #22304a; }
+      .hist-item .ok { color: #4ade80; }
+      .hist-item .bad { color: #f87171; }
+      .checklist { display: flex; flex-direction: column; gap: 6px; }
+      .check-row {
+        display: flex; gap: 10px; align-items: baseline; font-size: 13px;
+        padding: 8px 11px; border-radius: 8px; background: var(--panel-2); border-left: 3px solid var(--border);
+      }
+      .check-row.ok { border-left-color: var(--accent-2); }
+      .check-row.fail { border-left-color: var(--danger); }
+      .check-row.warn { border-left-color: #fbbf24; }
+      .check-row .t { min-width: 132px; color: var(--muted); }
+      .check-row .d { color: var(--muted); font-size: 12px; }
+      .check-row .r { margin-left: auto; white-space: nowrap; font-size: 11px; color: var(--muted); }
+      /* ---- 文章浏览 ---- */
+      .browse-grid { display: grid; grid-template-columns: minmax(240px, 330px) 1fr; gap: 18px; align-items: start; }
+      @media (max-width: 900px) { .browse-grid { grid-template-columns: 1fr; } }
+      .browse-list { display: flex; flex-direction: column; gap: 5px; max-height: 62vh; overflow: auto; padding-right: 4px; margin-top: 8px; }
+      .browse-item {
+        padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px;
+        background: var(--panel-2); cursor: pointer;
+      }
+      .browse-item:hover { border-color: var(--accent); }
+      .browse-item.active { border-color: var(--accent); background: #16233a; }
+      .browse-item .t { font-size: 13px; display: block; }
+      .browse-item .m { font-size: 11px; color: var(--muted); margin-top: 3px; }
+      .browse-article-title { font-size: 17px; }
+      .browse-meta a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <h1>WebClip</h1>
+        <span class="badge" id="health">检测中…</span>
+        <span class="badge">无头浏览器 → Markdown → 本地图床</span>
+      </header>
+
+      <div class="viewtabs">
+        <button data-view="clip" class="active">抓取网页</button>
+        <button data-view="browse">文章浏览</button>
+        <button data-view="api">API 测试</button>
+      </div>
+
+      <section id="view-clip">
+      <p class="sub">
+        输入网址，服务会用无头浏览器打开页面、剔除广告与无关内容、把正文转成 Markdown，
+        并把图片/视频等多媒体文件保存到本地图床后改写链接。
+      </p>
+
+      <div class="card">
+        <div class="row">
+          <input id="url" type="url" placeholder="https://example.com/article" autocomplete="off" />
+          <button id="go">开始抓取</button>
+        </div>
+        <details class="options">
+          <summary>高级选项</summary>
+          <div class="optgrid">
+            <div>
+              <label for="engine">抓取引擎</label>
+              <select id="engine">
+                <option value="browser">browser（无头 Chromium，推荐）</option>
+                <option value="fetch">fetch（纯 HTTP，更快）</option>
+              </select>
+            </div>
+            <div>
+              <label for="imageMode">媒体处理</label>
+              <select id="imageMode">
+                <option value="local">local（下载到本地图床并改写链接）</option>
+                <option value="remote">remote（保留原始外链）</option>
+                <option value="none">none（删除所有媒体）</option>
+              </select>
+            </div>
+            <div>
+              <label for="waitSelector">等待选择器（可选）</label>
+              <input id="waitSelector" type="text" placeholder="article, .post-content" />
+            </div>
+            <div>
+              <label for="waitMs">额外等待（毫秒）</label>
+              <input id="waitMs" type="text" placeholder="0" />
+            </div>
+            <div>
+              <label for="removeSelectors">额外删除的选择器（逗号分隔）</label>
+              <input id="removeSelectors" type="text" placeholder=".paywall, #comments" />
+            </div>
+            <div>
+              <label for="token">API Token（服务端设置了 API_TOKEN 时必填）</label>
+              <input id="token" type="password" placeholder="可选" />
+            </div>
+          </div>
+          <div class="row" style="margin-top:14px; gap:18px">
+            <label class="check"><input type="checkbox" id="includeVideos" checked /> 保存视频</label>
+            <label class="check"><input type="checkbox" id="includeImages" checked /> 保存图片</label>
+            <label class="check"><input type="checkbox" id="filterAds" checked /> 过滤广告</label>
+            <label class="check"><input type="checkbox" id="scroll" checked /> 自动滚动触发懒加载</label>
+            <label class="check"><input type="checkbox" id="frontmatter" checked /> 生成 YAML frontmatter</label>
+            <label class="check" title="只保存视频/图片：素材落到独立目录（默认与 DATA_DIR 同级），不生成文章">
+              <input type="checkbox" id="mediaOnly" /> 只下载视频图片
+            </label>
+          </div>
+          <div class="row" style="margin-top:12px; gap:10px; align-items:center">
+            <label for="webhookUrl" style="min-width:auto">Webhook</label>
+            <input id="webhookUrl" type="text" style="flex:1"
+              placeholder="留空 = 用服务端 WEBHOOK_URL；也可填 https://… 覆盖（抓完 POST 一条通知）" />
+            <select id="webhookMode" title="抓完是否发通知">
+              <option value="auto">通知：跟随（只下载模式自动发）</option>
+              <option value="on">通知：总是发</option>
+              <option value="off">通知：不发</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:12px; gap:10px; align-items:center">
+            <label for="xhsApiUrl" style="min-width:auto">小红书解析</label>
+            <input id="xhsApiUrl" type="text" style="flex:1"
+              placeholder="留空 = 用服务端 XIAOHONGSHU_API；也可填 http://…/xhs/detail 覆盖（自建解析器优先，拿到标题/正文/直链）" />
+            <label for="xhsParserOnly" style="min-width:auto" title="只走解析器、不打开网页：避开「安全限制」这类风控页">
+              <input type="checkbox" id="xhsParserOnly" checked /> 只走解析器
+            </label>
+          </div>
+        </details>
+      </div>
+
+      <div id="status" class="card hidden"></div>
+
+      <div id="result" class="card hidden">
+        <div class="stats" id="stats"></div>
+        <div class="tabs">
+          <button data-tab="preview" class="active">预览</button>
+          <button data-tab="markdown">Markdown</button>
+          <button data-tab="media">媒体 <span id="mediaCount"></span></button>
+          <button data-tab="meta">元数据</button>
+        </div>
+        <div id="tab-preview" class="md-preview"></div>
+        <div id="tab-markdown" class="hidden">
+          <div class="row" style="margin-bottom:10px">
+            <button class="ghost" id="copy">复制 Markdown</button>
+            <button class="ghost" id="download">下载 .md</button>
+            <button class="ghost" id="deleteArticle">删除这篇文章</button>
+            <a id="openApi" class="badge" target="_blank" rel="noreferrer">接口地址</a>
+          </div>
+          <pre class="box" id="markdownBox"></pre>
+        </div>
+        <div id="tab-media" class="hidden">
+          <div class="mediagrid" id="mediaGrid"></div>
+        </div>
+        <div id="tab-meta" class="hidden"><pre class="box" id="metaBox"></pre></div>
+        <div id="warnings" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <b>最近转换</b>
+          <div class="row" style="gap:12px">
+            <label class="check"><input type="checkbox" id="deleteWithMedia" checked /> 删除时同时清理图床文件</label>
+            <button class="ghost" id="gcMedia">回收孤儿图床文件</button>
+            <button class="ghost" id="refresh">刷新</button>
+          </div>
+        </div>
+        <div id="recent" style="margin-top:8px"></div>
+      </div>
+      </section>
+
+      <section id="view-api" class="hidden">
+        <p class="sub">
+          挑选接口 → 填参数 → 发送，实时查看状态码、耗时、响应头与响应体；也可以在部署后
+          <b>一键自检</b>，确认抓取、图床与鉴权是否正常。
+        </p>
+
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <b>一键自检</b>
+            <div class="row" style="gap:14px">
+              <label class="check"><input type="checkbox" id="selfCheckReal" checked /> 包含真实站点抓取</label>
+              <label class="check"><input type="checkbox" id="selfCheckBrowser" checked /> 用无头浏览器</label>
+              <button class="ghost" id="apiReport">复制报告</button>
+              <button id="selfCheckRun">开始自检</button>
+            </div>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <label class="check" style="flex:1 1 320px"><span class="kv">自检目标</span>
+              <input id="selfCheckUrl" type="text" value="https://example.com" style="max-width:340px" />
+            </label>
+          </div>
+          <div id="selfCheckResult" style="margin-top:14px"></div>
+        </div>
+
+        <div class="api-grid">
+          <div class="card">
+            <div class="row" style="justify-content:space-between">
+              <b>接口列表</b>
+              <span class="kv" id="endpointCount"></span>
+            </div>
+            <div class="endpoint-list" id="endpointList" style="margin-top:10px"></div>
+          </div>
+
+          <div class="card">
+            <div class="row" style="justify-content:space-between">
+              <div class="row" style="gap:10px">
+                <span class="method GET" id="reqMethod">GET</span>
+                <code id="reqPath">/healthz</code>
+              </div>
+              <div class="row" style="gap:8px">
+                <label class="check"><input type="checkbox" id="apiAcceptMarkdown" /> Accept: text/markdown</label>
+                <button class="ghost" id="apiCurl">复制 curl</button>
+                <button id="apiSend">发送</button>
+              </div>
+            </div>
+            <div class="kv" id="apiSummary" style="margin-top:8px"></div>
+            <div id="apiFields" style="margin-top:14px"></div>
+            <div id="apiBodyWrap" style="margin-top:10px">
+              <label for="apiBody" class="kv">请求体 JSON（可直接编辑，留空表示不带请求体）</label>
+              <textarea id="apiBody" rows="6" spellcheck="false" style="margin-top:6px"></textarea>
+            </div>
+            <div class="row" style="margin-top:12px">
+              <button class="ghost" id="apiFillRecent">用最近一篇文章的 id 填充</button>
+              <span class="kv" id="apiHint"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <div class="row" style="gap:10px">
+              <b>响应</b>
+              <span id="apiStatusPill" class="status-pill ok hidden"></span>
+              <span class="kv" id="apiMeta"></span>
+            </div>
+            <div class="row" style="gap:8px">
+              <button class="ghost" id="apiPreviewBtn" disabled>预览 Markdown</button>
+              <button class="ghost" id="apiCopyResponse">复制响应</button>
+            </div>
+          </div>
+          <div id="apiPreview" class="md-preview hidden" style="margin-top:12px"></div>
+          <pre class="box" id="apiResponse" style="margin-top:12px">尚未发送请求</pre>
+          <div class="mediagrid" id="apiMediaGrid" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <div class="row" style="justify-content:space-between">
+            <b>请求历史</b>
+            <button class="ghost" id="apiClearHistory">清空</button>
+          </div>
+          <div class="hist" id="apiHistory" style="margin-top:8px"></div>
+        </div>
+      </section>
+
+      <section id="view-browse" class="hidden">
+        <p class="sub">
+          浏览已存档的 Markdown 文章：左侧选择，右侧直接阅读渲染结果，也可以切换源码、复制、下载或删除。
+          链接形如 <code>#browse/&lt;文章 id&gt;</code>，可以直接分享或收藏。
+        </p>
+        <div class="tabs" id="browseModeTabs" style="margin-bottom:16px">
+          <button data-bmode="articles" class="active">文章</button>
+          <button data-bmode="urls">网址记录 <span id="urlCount"></span></button>
+        </div>
+
+        <div id="browseModeUrls" class="hidden">
+          <div class="card">
+            <div class="row" style="gap:8px">
+              <input id="urlSearch" type="text" placeholder="搜索网址或标题…" />
+              <button class="ghost" id="urlRefresh">刷新</button>
+            </div>
+            <div class="kv" id="urlSummary" style="margin-top:10px"></div>
+            <div id="urlList" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div id="browseModeArticles">
+        <div class="browse-grid">
+          <div class="card">
+            <div class="row" style="gap:8px">
+              <input id="browseSearch" type="text" placeholder="搜索标题 / 站点 / 作者…" />
+              <button class="ghost" id="browseRefresh">刷新</button>
+            </div>
+            <div class="kv" id="browseCount" style="margin-top:10px"></div>
+            <div class="browse-list" id="browseList"></div>
+            <div class="row" style="margin-top:12px; justify-content:space-between">
+              <button class="ghost" id="browsePrev">上一页</button>
+              <span class="kv" id="browsePage"></span>
+              <button class="ghost" id="browseNext">下一页</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div id="browseEmpty" class="kv">左侧选择一篇文章开始浏览（还没有文章就去「抓取网页」转一篇）</div>
+            <div id="browseArticle" class="hidden">
+              <div class="row" style="justify-content:space-between; align-items:flex-start">
+                <b class="browse-article-title" id="browseTitle"></b>
+                <div class="row" style="gap:8px">
+                  <button class="ghost" id="browseCopy">复制</button>
+                  <button class="ghost" id="browseDownload">下载 .md</button>
+                  <button class="ghost" id="browseDelete">删除</button>
+                </div>
+              </div>
+              <div class="kv browse-meta" id="browseMeta" style="margin-top:10px"></div>
+              <div class="tabs" id="browseTabs" style="margin-top:14px">
+                <button data-btab="render" class="active">渲染</button>
+                <button data-btab="raw">Markdown 源码</button>
+                <button data-btab="media">媒体 <span id="browseMediaCount"></span></button>
+              </div>
+              <div class="md-preview" id="browsePreview"></div>
+              <pre class="box hidden" id="browseRaw"></pre>
+              <div class="mediagrid hidden" id="browseMediaGrid"></div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const state = { last: null, tab: 'preview' };
+
+      const token = () => $('token').value.trim() || localStorage.getItem('webclip_token') || '';
+      $('token').value = localStorage.getItem('webclip_token') || '';
+      $('token').addEventListener('change', () => localStorage.setItem('webclip_token', $('token').value.trim()));
+
+      function headers(extra = {}) {
+        const h = { ...extra };
+        const t = token();
+        if (t) h['x-api-token'] = t;
+        return h;
+      }
+
+      async function api(path, opts = {}) {
+        const res = await fetch(path, { ...opts, headers: headers(opts.headers || {}) });
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch { /* 非 JSON */ }
+        if (!res.ok) {
+          const message = json?.error?.message || text.slice(0, 400) || res.statusText;
+          throw new Error(`HTTP ${res.status}: ${message}`);
+        }
+        return json;
+      }
+
+      async function checkHealth() {
+        try {
+          const res = await fetch('/healthz');
+          const data = await res.json();
+          $('health').textContent = `服务正常 · v${data.version} · 浏览器${data.browser.connected ? '已就绪' : '待启动'}`;
+          $('health').className = 'badge ok';
+        } catch {
+          $('health').textContent = '服务不可用';
+          $('health').className = 'badge err';
+        }
+      }
+
+      function setStatus(html, kind = '') {
+        const el = $('status');
+        if (!html) { el.classList.add('hidden'); return; }
+        el.classList.remove('hidden');
+        el.innerHTML = html;
+        el.className = 'card' + (kind ? ' ' + kind : '');
+      }
+
+      function collectOptions() {
+        const removeSelectors = $('removeSelectors').value.split(',').map((s) => s.trim()).filter(Boolean);
+        const webhookMode = $('webhookMode').value;
+        const webhookUrl = $('webhookUrl').value.trim();
+        const xhsApiUrl = $('xhsApiUrl').value.trim();
+        return {
+          engine: $('engine').value,
+          imageMode: $('imageMode').value,
+          includeImages: $('includeImages').checked,
+          includeVideos: $('includeVideos').checked,
+          filterAds: $('filterAds').checked,
+          scroll: $('scroll').checked,
+          frontmatter: $('frontmatter').checked,
+          // 只下载视频图片：素材落到独立目录，不生成文章
+          mediaOnly: $('mediaOnly').checked || undefined,
+          // 通知：跟随 = 不传（服务端按"只下载模式 + 是否配了 WEBHOOK_URL"决定）
+          webhook: webhookMode === 'auto' ? undefined : webhookMode === 'on',
+          webhookUrl: webhookUrl || undefined,
+          // 小红书自建解析器地址：填了本次就优先用它解析（留空用服务端 XIAOHONGSHU_API）
+          xhsApiUrl: xhsApiUrl || undefined,
+          // "只走解析器"：默认开（不传 = 跟随服务端 XIAOHONGSHU_PARSER_ONLY）；取消勾选则明确关闭
+          xhsParserOnly: $('xhsParserOnly').checked ? undefined : false,
+          waitSelector: $('waitSelector').value.trim() || undefined,
+          waitMs: Number($('waitMs').value) > 0 ? Number($('waitMs').value) : undefined,
+          removeSelectors: removeSelectors.length ? removeSelectors : undefined,
+        };
+      }
+
+      async function convert() {
+        const url = $('url').value.trim();
+        if (!url) { setStatus('<span class="err">请输入网址</span>'); return; }
+        $('go').disabled = true;
+        setStatus('<span class="spinner"></span>正在抓取并转换，请稍候…（首次请求需要冷启动浏览器）');
+        $('result').classList.add('hidden');
+        try {
+          const json = await api('/api/convert', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ url, ...collectOptions() }),
+          });
+          render(json.data);
+          setStatus('');
+          loadRecent();
+        } catch (err) {
+          setStatus(`<span class="err">${escapeHtml(err.message)}</span>`);
+        } finally {
+          $('go').disabled = false;
+        }
+      }
+
+      function render(data) {
+        state.last = data;
+        $('result').classList.remove('hidden');
+        const s = data.stats || {};
+        const m = s.media || {};
+        $('stats').innerHTML = `
+          <span>标题：<b>${escapeHtml(data.title || '-')}</b></span>
+          <span>文件名：<b>${escapeHtml(data.filename || '-')}</b></span>
+          <span>字数：<b>${s.words ?? '-'}</b></span>
+          <span>媒体：<b>${data.media?.length ?? 0}</b>（新增下载 ${m.saved ?? 0} / 命中缓存 ${m.reusedFromCache ?? 0} / 网络捕获 ${m.reusedFromCapture ?? 0}）</span>
+          <span>拦截广告请求：<b>${s.adsBlocked ?? 0}</b></span>
+          <span>耗时：<b>${s.elapsedMs ?? '-'}ms</b></span>
+          <span>引擎：<b>${data.engine}</b></span>
+          ${data.mediaOnly ? `<span>只下载模式，素材目录：<b>${escapeHtml(data.mediaOnly.dir || '')}</b></span>` : ''}
+          ${
+            data.webhook
+              ? `<span>通知：<b>${
+                  data.webhook.ok
+                    ? `已发送（${data.webhook.statuses?.at(-1) ?? data.webhook.status ?? '-'}${data.webhook.parts > 1 ? ` × ${data.webhook.parts} 条` : ''}）`
+                    : `发送失败（${escapeHtml(data.webhook.error || data.webhook.skipped || '')}）`
+                }</b>${data.webhook.hint ? `<br /><span class="meta">${escapeHtml(data.webhook.hint)}</span>` : ''}</span>`
+              : ''
+          }
+        `;
+        $('markdownBox').textContent = data.markdown || '(未返回正文，可设置 returnMarkdown=true)';
+        $('metaBox').textContent = JSON.stringify(data, null, 2);
+        $('mediaCount').textContent = data.media?.length ? `(${data.media.length})` : '';
+        $('openApi').href = data.articleApiUrl || `/api/articles/${data.id}`;
+        $('openApi').textContent = data.markdownUrl ? 'Markdown 直链' : '接口地址';
+        $('openApi').href = data.markdownUrl || data.articleApiUrl || '#';
+        $('tab-preview').innerHTML = renderMarkdown(data.markdown || '');
+        const grid = $('mediaGrid');
+        grid.innerHTML = (data.media || []).map((item) => {
+          const isImage = String(item.mime || '').startsWith('image/');
+          const thumb = isImage
+            ? `<img src="${escapeAttr(item.localUrl)}" alt="" loading="lazy" />`
+            : `<div style="height:110px;display:flex;align-items:center;justify-content:center;color:#9aa3b2">${item.kind === 'video' ? '▶ 视频' : '♪ 音频'}</div>`;
+          return `<figure><a href="${escapeAttr(item.localUrl)}" target="_blank" rel="noreferrer">${thumb}</a>
+            <figcaption title="${escapeAttr(item.localPath || item.sourceUrl)}">${escapeHtml(item.file || '')}<br />${Math.round((item.bytes || 0) / 1024)} KB · ${escapeHtml(item.kind)}</figcaption></figure>`;
+        }).join('') || '<div class="meta">没有媒体文件</div>';
+        const warnings = (data.warnings || []).concat(
+          (data.mediaFailures || []).slice(0, 8).map((f) => `媒体失败：${f.url}（${f.reason}）`),
+        );
+        $('warnings').innerHTML = warnings.length
+          ? `<div class="warn">⚠ ${warnings.map(escapeHtml).join('<br />⚠ ')}</div>`
+          : '';
+        selectTab('preview');
+      }
+
+      function selectTab(name) {
+        state.tab = name;
+        for (const btn of document.querySelectorAll('.tabs button')) {
+          btn.classList.toggle('active', btn.dataset.tab === name);
+        }
+        for (const key of ['preview', 'markdown', 'media', 'meta']) {
+          $(`tab-${key}`).classList.toggle('hidden', key !== name);
+        }
+      }
+
+      document.querySelectorAll('.tabs button').forEach((btn) =>
+        btn.addEventListener('click', () => selectTab(btn.dataset.tab)),
+      );
+
+      $('go').addEventListener('click', convert);
+      $('url').addEventListener('keydown', (e) => { if (e.key === 'Enter') convert(); });
+      $('copy').addEventListener('click', async () => {
+        await navigator.clipboard.writeText(state.last?.markdown || '');
+        $('copy').textContent = '已复制 ✓';
+        setTimeout(() => ($('copy').textContent = '复制 Markdown'), 1500);
+      });
+      $('download').addEventListener('click', () => {
+        if (!state.last) return;
+        const filename = state.last.filename || `${(state.last.title || state.last.id || 'article').replace(/[\\/:*?"<>|]/g, '_')}.md`;
+        const blob = new Blob([state.last.markdown || ''], { type: 'text/markdown;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      $('refresh').addEventListener('click', loadRecent);
+      $('gcMedia').addEventListener('click', collectOrphanMedia);
+      $('deleteArticle').addEventListener('click', () => {
+        if (!state.last?.id) return;
+        removeArticle(state.last.id, state.last.title);
+      });
+
+      async function loadRecent() {
+        try {
+          const json = await api('/api/articles?limit=10');
+          const items = json.data.items || [];
+          $('recent').innerHTML = items.length
+            ? items.map((it) => `<div class="list-item">
+                <div>
+                  <a href="${escapeAttr(it.markdownUrl)}" target="_blank" rel="noreferrer">${escapeHtml(it.title || it.id)}</a>
+                  <div class="meta">${escapeHtml(it.siteName || '')} ${it.author ? '· ' + escapeHtml(it.author) : ''} · ${it.mediaCount} 张图 · ${new Date(it.createdAt).toLocaleString('zh-CN')}</div>
+                  <div class="meta">下载名：<code>${escapeHtml(it.filename || '')}</code></div>
+                </div>
+                <div class="meta row" style="gap:10px">
+                  <a href="${escapeAttr(it.downloadUrl)}">下载</a>
+                  <a href="#" data-delete="${escapeAttr(it.id)}" data-title="${escapeAttr(it.title || it.id)}" class="danger-link">删除</a>
+                </div>
+              </div>`).join('')
+            : '<div class="meta">暂无记录</div>';
+
+          for (const link of $('recent').querySelectorAll('[data-delete]')) {
+            link.addEventListener('click', (event) => {
+              event.preventDefault();
+              removeArticle(link.dataset.delete, link.dataset.title);
+            });
+          }
+        } catch (err) {
+          $('recent').innerHTML = `<div class="meta">${escapeHtml(err.message)}</div>`;
+        }
+      }
+
+      async function removeArticle(id, title) {
+        const withMedia = $('deleteWithMedia').checked;
+        const label = title ? `《${title}》` : id;
+        if (!window.confirm(`确定删除 ${label} 吗？${withMedia ? '\n（同时清理它独占的图床文件，被其它文章共用的会保留）' : ''}`)) {
+          return;
+        }
+        try {
+          const json = await api(`/api/articles/${encodeURIComponent(id)}?withMedia=${withMedia ? 1 : 0}`, {
+            method: 'DELETE',
+          });
+          const media = json?.data?.media;
+          const detail = media
+            ? `，图床删除 ${media.removed} 个文件（${formatBytes(media.freedBytes || 0)}）${media.keptBecauseShared ? `，保留 ${media.keptBecauseShared} 个被共用的` : ''}`
+            : '';
+          setStatus(`已删除 ${escapeHtml(label)}${escapeHtml(detail)}`);
+          if (state.last?.id === id) {
+            state.last = null;
+            $('result').classList.add('hidden');
+          }
+          loadRecent();
+        } catch (err) {
+          setStatus(`<span class="err">删除失败：${escapeHtml(err.message)}</span>`);
+        }
+      }
+
+      async function collectOrphanMedia() {
+        if (!window.confirm('回收没有被任何文章引用的图床文件？此操作不可撤销。')) return;
+        $('gcMedia').disabled = true;
+        try {
+          const preview = await api('/api/media/gc', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ dryRun: true }),
+          });
+          const orphan = preview.data.orphanFiles;
+          if (!orphan) {
+            setStatus('没有需要回收的孤儿文件（图床里没有多余文件）');
+            return;
+          }
+          if (!window.confirm(`发现 ${orphan} 个无引用文件，共 ${formatBytes(preview.data.orphanBytes)}，确认删除？`)) return;
+          const json = await api('/api/media/gc', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          setStatus(`已回收 ${json.data.removed} 个孤儿文件，释放 ${formatBytes(json.data.freedBytes || 0)}`);
+        } catch (err) {
+          setStatus(`<span class="err">回收失败：${escapeHtml(err.message)}</span>`);
+        } finally {
+          $('gcMedia').disabled = false;
+        }
+      }
+
+      function escapeHtml(s) {
+        return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+      const escapeAttr = escapeHtml;
+
+      /* 极简 Markdown 渲染器：仅用于本地预览，不作为正式渲染方案 */
+      function renderMarkdown(md) {
+        const esc = escapeHtml;
+        const blocks = [];
+        let text = String(md || '').replace(/^---\n[\s\S]*?\n---\n/, '');
+        text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
+          blocks.push(`<pre><code data-lang="${esc(lang)}">${esc(code)}</code></pre>`);
+          return `\u0000${blocks.length - 1}\u0000`;
+        });
+        // 视频/音频用真实 HTML 标签，预览里可以直接播放（其余 HTML 一律转义防注入）
+        text = text.replace(/<(video|audio)\b([^>]*)>\s*<\/\1>|<(video|audio)\b([^>]*)\/?>/gi, (match, t1, attrs1, t2, attrs2) => {
+          const tag = (t1 || t2).toLowerCase();
+          const rawAttrs = attrs1 !== undefined ? attrs1 : attrs2 || '';
+          const src = /src=["']([^"']+)["']/i.exec(rawAttrs)?.[1] || '';
+          const poster = /poster=["']([^"']+)["']/i.exec(rawAttrs)?.[1] || '';
+          if (!src || !/^(https?:|\/)/i.test(src)) return match;
+          const attrs = [`src="${escapeAttr(src)}"`, 'controls', 'preload="metadata"'];
+          if (poster) attrs.push(`poster="${escapeAttr(poster)}"`);
+          blocks.push(`<${tag} ${attrs.join(' ')}></${tag}>`);
+          return `\u0000${blocks.length - 1}\u0000`;
+        });
+        const inline = (s) =>
+          esc(s)
+            .replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, '<img alt="$1" src="$2" loading="lazy" />')
+            .replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/(^|\W)\*([^*\n]+)\*/g, '$1<em>$2</em>')
+            .replace(/~~([^~]+)~~/g, '<del>$1</del>');
+
+        const out = [];
+        let inList = false;
+        for (const rawLine of text.split('\n')) {
+          const line = rawLine.trimEnd();
+          if (!line.trim()) { if (inList) { out.push('</ul>'); inList = false; } continue; }
+          const ph = line.match(/^\u0000(\d+)\u0000$/);
+          if (ph) { if (inList) { out.push('</ul>'); inList = false; } out.push(blocks[Number(ph[1])]); continue; }
+          const h = line.match(/^(#{1,6})\s+(.*)$/);
+          if (h) { if (inList) { out.push('</ul>'); inList = false; } out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); continue; }
+          if (/^>\s?/.test(line)) { if (inList) { out.push('</ul>'); inList = false; } out.push(`<blockquote>${inline(line.replace(/^>\s?/, ''))}</blockquote>`); continue; }
+          if (/^(-{3,}|\*{3,})$/.test(line.trim())) { if (inList) { out.push('</ul>'); inList = false; } out.push('<hr />'); continue; }
+          const li = line.match(/^\s*[-*+]\s+(.*)$/) || line.match(/^\s*\d+[.)]\s+(.*)$/);
+          if (li) { if (!inList) { out.push('<ul>'); inList = true; } out.push(`<li>${inline(li[1])}</li>`); continue; }
+          if (inList) { out.push('</ul>'); inList = false; }
+          out.push(`<p>${inline(line)}</p>`);
+        }
+        if (inList) out.push('</ul>');
+        return out.join('\n');
+      }
+
+      /* ============================================================
+       * 视图切换 + hash 路由（#clip / #browse/<id> / #api）
+       * ============================================================ */
+      function switchView(view, { updateHash = true } = {}) {
+        for (const btn of document.querySelectorAll('.viewtabs button')) {
+          btn.classList.toggle('active', btn.dataset.view === view);
+        }
+        document.getElementById('view-clip').classList.toggle('hidden', view !== 'clip');
+        document.getElementById('view-api').classList.toggle('hidden', view !== 'api');
+        document.getElementById('view-browse').classList.toggle('hidden', view !== 'browse');
+        try {
+          localStorage.setItem('webclip_view', view);
+        } catch { /* ignore */ }
+        if (updateHash) {
+          const suffix = view === 'browse' && browseState.currentId ? `/${encodeURIComponent(browseState.currentId)}` : '';
+          const target = `#${view}${suffix}`;
+          if (location.hash !== target) history.replaceState(null, '', target);
+        }
+        if (view === 'browse' && !browseState.loaded) loadBrowse();
+      }
+
+      document.querySelectorAll('.viewtabs button').forEach((btn) =>
+        btn.addEventListener('click', () => switchView(btn.dataset.view)),
+      );
+
+      function applyHash() {
+        const raw = decodeURIComponent(String(location.hash || '').replace(/^#/, ''));
+        const [view, ...rest] = raw.split('/');
+        const id = rest.join('/');
+        if (view === 'api' || view === 'browse' || view === 'clip') {
+          switchView(view, { updateHash: false });
+          if (view === 'browse') {
+            if (id) openArticle(id, { updateHash: false });
+            else if (!browseState.loaded) loadBrowse();
+          }
+        } else if (!raw) {
+          switchView(localStorage.getItem('webclip_view') === 'browse' ? 'browse' : localStorage.getItem('webclip_view') === 'api' ? 'api' : 'clip', { updateHash: false });
+        }
+      }
+
+      /* ============================================================
+       * 文章浏览
+       * ============================================================ */
+      const browseState = { items: [], total: 0, page: 0, pageSize: 10, q: '', loaded: false, currentId: null, markdown: '', meta: null };
+
+      function browseOffset() {
+        return browseState.page * browseState.pageSize;
+      }
+
+      async function loadBrowse() {
+        browseState.loaded = true;
+        try {
+          const params = new URLSearchParams({ limit: String(browseState.pageSize), offset: String(browseOffset()) });
+          if (browseState.q) params.set('q', browseState.q);
+          const json = await api(`/api/articles?${params.toString()}`);
+          browseState.items = json.data.items || [];
+          browseState.total = json.data.total || 0;
+          renderBrowseList();
+        } catch (err) {
+          $('browseList').innerHTML = `<div class="kv">${escapeHtml(err.message)}</div>`;
+          $('browseCount').textContent = '';
+        }
+      }
+
+      function renderBrowseList() {
+        const list = $('browseList');
+        const { items, total, page, pageSize } = browseState;
+        $('browseCount').textContent = total
+          ? `共 ${total} 篇${browseState.q ? `（搜索：${browseState.q}）` : ''}`
+          : browseState.q
+            ? '没有匹配的文章'
+            : '还没有文章';
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        $('browsePage').textContent = total ? `第 ${page + 1} / ${pages} 页` : '';
+        $('browsePrev').disabled = page <= 0;
+        $('browseNext').disabled = (page + 1) * pageSize >= total;
+
+        list.innerHTML = items.length
+          ? items.map((item) => `<div class="browse-item${item.id === browseState.currentId ? ' active' : ''}" data-id="${escapeAttr(item.id)}">
+              <span class="t">${escapeHtml(item.title || item.id)}</span>
+              <span class="m">${escapeHtml(item.siteName || '')} ${item.author ? '· ' + escapeHtml(item.author) : ''} · ${item.words || 0} 字 · ${item.mediaCount || 0} 媒体</span>
+              <span class="m">${escapeHtml(item.filename || '')}</span>
+            </div>`).join('')
+          : '<div class="kv">没有可显示的文章</div>';
+
+        for (const el of list.querySelectorAll('.browse-item')) {
+          el.addEventListener('click', () => openArticle(el.dataset.id));
+        }
+      }
+
+      async function openArticle(id, { updateHash = true } = {}) {
+        browseState.currentId = id;
+        $('browseEmpty').classList.add('hidden');
+        $('browseArticle').classList.remove('hidden');
+        $('browseTitle').textContent = '载入中…';
+        $('browseMeta').textContent = '';
+        $('browsePreview').innerHTML = '';
+        $('browseRaw').textContent = '';
+        $('browseMediaGrid').innerHTML = '';
+        renderBrowseList();
+        if (updateHash) {
+          const target = `#browse/${encodeURIComponent(id)}`;
+          if (location.hash !== target) history.replaceState(null, '', target);
+        }
+
+        try {
+          const json = await api(`/api/articles/${encodeURIComponent(id)}?includeMarkdown=1`);
+          const meta = json.data || {};
+          browseState.meta = meta;
+          browseState.markdown = meta.markdown || '';
+          const media = meta.media || [];
+
+          $('browseTitle').textContent = meta.title || meta.id;
+          const bits = [
+            meta.siteName ? escapeHtml(meta.siteName) : '',
+            meta.author ? escapeHtml(meta.author) : '',
+            meta.published ? `发布 ${escapeHtml(String(meta.published).slice(0, 10))}` : '',
+            `存档 ${escapeHtml(String(meta.createdAt || '').slice(0, 16).replace('T', ' '))}`,
+            `${meta.stats?.words ?? 0} 字`,
+            `${media.length} 个媒体`,
+            meta.filename ? `文件名 <code>${escapeHtml(meta.filename)}</code>` : '',
+            meta.finalUrl || meta.url
+              ? `<a href="${escapeAttr(meta.finalUrl || meta.url)}" target="_blank" rel="noreferrer">原文链接</a>`
+              : '',
+          ].filter(Boolean);
+          $('browseMeta').innerHTML = bits.join(' · ');
+
+          $('browsePreview').innerHTML = renderMarkdown(browseState.markdown);
+          $('browseRaw').textContent = browseState.markdown;
+          $('browseMediaCount').textContent = media.length ? `(${media.length})` : '';
+          $('browseMediaGrid').innerHTML = media.length
+            ? media
+                .map((item) => {
+                  const isImage = String(item.mime || '').startsWith('image/');
+                  const thumb = isImage
+                    ? `<img src="${escapeAttr(item.localUrl)}" alt="" loading="lazy" />`
+                    : `<div style="height:110px;display:flex;align-items:center;justify-content:center;color:#9aa3b2">${item.kind === 'video' ? '▶ 视频' : '♪ 音频'}</div>`;
+                  return `<figure><a href="${escapeAttr(item.localUrl)}" target="_blank" rel="noreferrer">${thumb}</a>
+                    <figcaption>${escapeHtml(item.file || '')}<br />${Math.round((item.bytes || 0) / 1024)} KB</figcaption></figure>`;
+                })
+                .join('')
+            : '<div class="kv">这篇文章没有媒体</div>';
+          selectBrowseTab('render');
+        } catch (err) {
+          $('browseTitle').textContent = '打开失败';
+          $('browseMeta').textContent = err.message;
+        }
+      }
+
+      function selectBrowseTab(name) {
+        for (const btn of document.querySelectorAll('#browseTabs button')) {
+          btn.classList.toggle('active', btn.dataset.btab === name);
+        }
+        $('browsePreview').classList.toggle('hidden', name !== 'render');
+        $('browseRaw').classList.toggle('hidden', name !== 'raw');
+        $('browseMediaGrid').classList.toggle('hidden', name !== 'media');
+      }
+
+      document.querySelectorAll('#browseTabs button').forEach((btn) =>
+        btn.addEventListener('click', () => selectBrowseTab(btn.dataset.btab)),
+      );
+
+      $('browseRefresh').addEventListener('click', loadBrowse);
+      $('browsePrev').addEventListener('click', () => {
+        if (browseState.page > 0) {
+          browseState.page -= 1;
+          loadBrowse();
+        }
+      });
+      $('browseNext').addEventListener('click', () => {
+        if ((browseState.page + 1) * browseState.pageSize < browseState.total) {
+          browseState.page += 1;
+          loadBrowse();
+        }
+      });
+      let browseSearchTimer = null;
+      $('browseSearch').addEventListener('input', () => {
+        clearTimeout(browseSearchTimer);
+        browseSearchTimer = setTimeout(() => {
+          browseState.q = $('browseSearch').value.trim();
+          browseState.page = 0;
+          loadBrowse();
+        }, 250);
+      });
+      $('browseCopy').addEventListener('click', (e) => copyText(browseState.markdown || '', e.currentTarget, '已复制 ✓'));
+      $('browseDownload').addEventListener('click', () => {
+        const meta = browseState.meta;
+        if (!meta) return;
+        const filename = meta.filename || `${(meta.title || meta.id || 'article').replace(/[\\/:*?"<>|]/g, '_')}.md`;
+        const blob = new Blob([browseState.markdown || ''], { type: 'text/markdown;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      $('browseDelete').addEventListener('click', async () => {
+        const meta = browseState.meta;
+        if (!meta) return;
+        await removeArticle(meta.id, meta.title);
+        browseState.currentId = null;
+        browseState.meta = null;
+        browseState.markdown = '';
+        $('browseArticle').classList.add('hidden');
+        $('browseEmpty').classList.remove('hidden');
+        browseState.loaded = false;
+        loadBrowse();
+      });
+      window.addEventListener('hashchange', applyHash);
+
+      /* ============================================================
+       * 网址记录（数据库）
+       * ============================================================ */
+      const urlState = { items: [], total: 0, q: '', loaded: false };
+
+      function switchBrowseMode(mode) {
+        for (const btn of document.querySelectorAll('#browseModeTabs button')) {
+          btn.classList.toggle('active', btn.dataset.bmode === mode);
+        }
+        $('browseModeArticles').classList.toggle('hidden', mode !== 'articles');
+        $('browseModeUrls').classList.toggle('hidden', mode !== 'urls');
+        if (mode === 'urls' && !urlState.loaded) loadUrls();
+      }
+
+      document.querySelectorAll('#browseModeTabs button').forEach((btn) =>
+        btn.addEventListener('click', () => switchBrowseMode(btn.dataset.bmode)),
+      );
+
+      async function loadUrls() {
+        urlState.loaded = true;
+        try {
+          const params = new URLSearchParams({ limit: '100' });
+          if (urlState.q) params.set('q', urlState.q);
+          const json = await api(`/api/urls?${params.toString()}`);
+          const data = json.data;
+          urlState.items = data.items || [];
+          urlState.total = data.total || 0;
+
+          if (data.available === false) {
+            $('urlSummary').innerHTML = `<span class="err">数据库不可用：${escapeHtml(data.reason || '')}</span><br />` +
+              '需要 Node ≥ 24（或 Node 22.5+ 加 --experimental-sqlite）并保证 DATA_DIR 可写。';
+            $('urlList').innerHTML = '';
+            return;
+          }
+
+          $('urlSummary').innerHTML =
+            `共记录 <b>${urlState.total}</b> 个网址${urlState.q ? `（搜索：${escapeHtml(urlState.q)}）` : ''}` +
+            ' · 正文未变化时再次抓取会直接复用存档，不再下载';
+          $('urlCount').textContent = urlState.total ? `${urlState.total}` : '';
+
+          $('urlList').innerHTML = urlState.items.length
+            ? urlState.items
+                .map(
+                  (row) => `<div class="list-item">
+                    <div style="min-width:0">
+                      <a href="${escapeAttr(row.url)}" target="_blank" rel="noreferrer" style="word-break:break-all">${escapeHtml(row.title || row.url)}</a>
+                      <div class="meta" style="word-break:break-all">${escapeHtml(row.url)}</div>
+                      <div class="meta">
+                        抓取 ${row.fetchCount} 次 · 正文变更 ${row.changeCount} 次 ·
+                        ${row.textLength} 字 · ${row.mediaCount} 媒体 ·
+                        指纹 <code>${escapeHtml(String(row.contentHash || '').slice(0, 8))}</code> ·
+                        最近 ${row.lastFetchedAt ? new Date(row.lastFetchedAt).toLocaleString('zh-CN') : '-'}
+                      </div>
+                    </div>
+                    <div class="meta row" style="gap:10px; white-space:nowrap">
+                      ${row.markdownUrl ? `<a href="${escapeAttr(row.markdownUrl)}" target="_blank" rel="noreferrer">正文</a>` : ''}
+                      ${row.articleId ? `<a href="#browse/${encodeURIComponent(row.articleId)}" data-open="${escapeAttr(row.articleId)}">浏览</a>` : ''}
+                      <a href="#" data-forget="${row.id}" data-url="${escapeAttr(row.url)}" class="danger-link">忘掉</a>
+                    </div>
+                  </div>`,
+                )
+                .join('')
+            : '<div class="kv">还没有网址记录（去抓一篇就有了）</div>';
+
+          for (const link of $('urlList').querySelectorAll('[data-open]')) {
+            link.addEventListener('click', (event) => {
+              event.preventDefault();
+              switchBrowseMode('articles');
+              openArticle(link.dataset.open);
+            });
+          }
+          for (const link of $('urlList').querySelectorAll('[data-forget]')) {
+            link.addEventListener('click', (event) => {
+              event.preventDefault();
+              forgetUrl(link.dataset.forget, link.dataset.url);
+            });
+          }
+        } catch (err) {
+          $('urlSummary').innerHTML = `<span class="err">${escapeHtml(err.message)}</span>`;
+        }
+      }
+
+      async function forgetUrl(id, url) {
+        if (!window.confirm(`忘掉这条网址记录吗？\n${url}\n\n（已存档的文章和图片都会保留；下次抓这个网址会完整重新下载一遍）`)) return;
+        try {
+          await api(`/api/urls/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          setStatus('已忘掉该网址记录，下次抓取会重新下载');
+          urlState.loaded = false;
+          loadUrls();
+        } catch (err) {
+          $('urlSummary').innerHTML = `<span class="err">${escapeHtml(err.message)}</span>`;
+        }
+      }
+
+      $('urlRefresh').addEventListener('click', () => {
+        urlState.loaded = false;
+        loadUrls();
+      });
+      let urlSearchTimer = null;
+      $('urlSearch').addEventListener('input', () => {
+        clearTimeout(urlSearchTimer);
+        urlSearchTimer = setTimeout(() => {
+          urlState.q = $('urlSearch').value.trim();
+          loadUrls();
+        }, 250);
+      });
+
+      /* ============================================================
+       * API 测试
+       * ============================================================ */
+      const FIELD_DEFS = {
+        url: { type: 'text', label: 'url', placeholder: 'https://example.com/article' },
+        urls: { type: 'text', label: 'urls', placeholder: '多个网址用逗号或换行分隔' },
+        id: { type: 'text', label: 'id', placeholder: '文章 id，也可直接粘贴 markdownUrl' },
+        engine: { type: 'select', label: 'engine', options: [['browser', 'browser（无头浏览器）'], ['fetch', 'fetch（纯 HTTP）']] },
+        imageMode: { type: 'select', label: 'imageMode', options: [['local', 'local（存到本地图床）'], ['remote', 'remote（保留外链）'], ['none', 'none（删除媒体）']] },
+        includeImages: { type: 'bool', label: 'includeImages' },
+        includeVideos: { type: 'bool', label: 'includeVideos' },
+        includeAudio: { type: 'bool', label: 'includeAudio' },
+        filterAds: { type: 'bool', label: 'filterAds' },
+        frontmatter: { type: 'bool', label: 'frontmatter' },
+        returnMarkdown: { type: 'bool', label: 'returnMarkdown' },
+        store: { type: 'bool', label: 'store（落盘）' },
+        mediaOnly: { type: 'bool', label: 'mediaOnly（只下载视频图片）' },
+        webhook: { type: 'bool', label: 'webhook（抓完发通知）' },
+        webhookUrl: { type: 'text', label: 'webhookUrl', placeholder: 'https://…（留空用服务端 WEBHOOK_URL）' },
+        xhsApiUrl: { type: 'text', label: 'xhsApiUrl', placeholder: 'http://…/xhs/detail（留空用服务端 XIAOHONGSHU_API）' },
+        xhsParserOnly: { type: 'bool', label: 'xhsParserOnly（小红书只走解析器）' },
+        includeMetaSection: { type: 'bool', label: 'includeMetaSection' },
+        scroll: { type: 'bool', label: 'scroll（自动滚动）' },
+        waitSelector: { type: 'text', label: 'waitSelector', placeholder: 'article, .post-content' },
+        waitMs: { type: 'number', label: 'waitMs', placeholder: '0' },
+        timeoutMs: { type: 'number', label: 'timeoutMs', placeholder: '120000' },
+        maxMediaFiles: { type: 'number', label: 'maxMediaFiles', placeholder: '80' },
+        maxVideoBytes: { type: 'number', label: 'maxVideoBytes', placeholder: '268435456' },
+        cookies: { type: 'text', label: 'cookies', placeholder: '登录态 Cookie 字符串' },
+        removeSelectors: { type: 'text', label: 'removeSelectors', placeholder: '.paywall, #comments' },
+        limit: { type: 'number', label: 'limit', placeholder: '20' },
+        offset: { type: 'number', label: 'offset', placeholder: '0' },
+        q: { type: 'text', label: 'q', placeholder: '标题关键词' },
+        sort: { type: 'select', label: 'sort', options: [['newest', 'newest'], ['oldest', 'oldest']] },
+        maxTotalBytes: { type: 'number', label: 'maxTotalBytes', placeholder: '留空 = 用服务端配置' },
+        includeMarkdown: { type: 'select', label: 'includeMarkdown', options: [['', '不带正文'], ['1', '带正文']] },
+        format: { type: 'select', label: 'format', options: [['', 'JSON 响应'], ['md', 'markdown 文本']] },
+        filenameTemplate: { type: 'text', label: 'filenameTemplate', placeholder: '{date}-{title}（留空用服务端默认）' },
+        withMedia: { type: 'bool', label: 'withMedia（连同图床文件）' },
+        force: { type: 'bool', label: 'force（强删被引用的文件）' },
+        dryRun: { type: 'bool', label: 'dryRun（只统计不删）' },
+        ids: { type: 'text', label: 'ids', placeholder: '多个文章 id，逗号或换行分隔' },
+        ref: { type: 'text', label: 'ref', placeholder: 'hash / hash 前缀 / 文件名' },
+      };
+
+      const ENDPOINTS = [
+        {
+          group: '抓取', method: 'POST', path: '/api/convert', summary: '转换单个网址（JSON）',
+          fields: ['url', 'engine', 'imageMode', 'includeImages', 'includeVideos', 'filterAds', 'scroll', 'waitSelector', 'waitMs', 'maxMediaFiles', 'returnMarkdown', 'store', 'mediaOnly', 'webhook', 'webhookUrl', 'xhsApiUrl', 'xhsParserOnly', 'cookies', 'filenameTemplate'],
+          defaults: { url: 'https://example.com', engine: 'browser', imageMode: 'local', includeImages: true, includeVideos: true, filterAds: true, scroll: true, returnMarkdown: true, store: true },
+        },
+        {
+          group: '抓取', method: 'GET', path: '/api/convert', summary: '直接返回 Markdown 文本',
+          fields: ['url', 'engine', 'imageMode', 'format'],
+          defaults: { url: 'https://example.com', engine: 'fetch', imageMode: 'remote', format: 'md' },
+          acceptMarkdown: true,
+        },
+        {
+          group: '抓取', method: 'POST', path: '/api/convert/batch', summary: '批量转换',
+          fields: ['urls', 'engine', 'imageMode', 'filenameTemplate', 'returnMarkdown', 'mediaOnly', 'webhookUrl', 'xhsApiUrl', 'xhsParserOnly'],
+          defaults: { urls: 'https://example.com\nhttps://example.org', engine: 'fetch', imageMode: 'local', returnMarkdown: false },
+        },
+        { group: '文章', method: 'GET', path: '/api/articles', summary: '文章列表', fields: ['limit', 'offset', 'q'], defaults: { limit: 10, offset: 0 } },
+        { group: '文章', method: 'GET', path: '/api/articles/:id', summary: '文章元数据', fields: ['id', 'includeMarkdown'], defaults: {} },
+        { group: '文章', method: 'GET', path: '/api/articles/:id/markdown', summary: '正文（text/markdown）', fields: ['id'], defaults: {} },
+        { group: '文章', method: 'GET', path: '/api/articles/:id/download', summary: '下载 .md', fields: ['id'], defaults: {} },
+        { group: '文章', method: 'DELETE', path: '/api/articles/:id', summary: '删除文章（可选清理图床）', fields: ['id', 'withMedia'], defaults: { withMedia: true } },
+        { group: '文章', method: 'POST', path: '/api/articles/delete', summary: '批量删除文章', fields: ['ids', 'withMedia'], defaults: { withMedia: true } },
+        { group: '图床', method: 'GET', path: '/api/media', summary: '图床文件列表', fields: ['limit', 'offset', 'sort'], defaults: { limit: 20, offset: 0, sort: 'newest' } },
+        { group: '图床', method: 'GET', path: '/api/media/by-url', summary: '按源地址查本地副本', fields: ['url'], defaults: {} },
+        { group: '图床', method: 'POST', path: '/api/media/prune', summary: '按容量淘汰旧文件', fields: ['maxTotalBytes'], defaults: {} },
+        { group: '图床', method: 'POST', path: '/api/media/gc', summary: '回收孤儿文件（无文章引用）', fields: ['dryRun'], defaults: { dryRun: true } },
+        { group: '图床', method: 'DELETE', path: '/api/media/:ref', summary: '删除单个图床文件', fields: ['ref', 'force'], defaults: {} },
+        { group: '诊断', method: 'GET', path: '/api/stats', summary: '图床/文章/配置统计', fields: [], defaults: {} },
+        { group: '诊断', method: 'GET', path: '/api/rules', summary: '广告规则规模', fields: [], defaults: {} },
+        { group: '诊断', method: 'GET', path: '/healthz', summary: '健康检查（无需鉴权）', fields: [], defaults: {} },
+      ];
+
+      const apiState = { current: 0, history: [], responseText: '', markdown: '', bodyDirty: false, values: {} };
+
+      function renderEndpointList() {
+        const list = $('endpointList');
+        let html = '';
+        let group = '';
+        ENDPOINTS.forEach((ep, index) => {
+          if (ep.group !== group) {
+            html += `<div class="endpoint-group">${escapeHtml(ep.group)}</div>`;
+            group = ep.group;
+          }
+          html += `<div class="endpoint-item" data-index="${index}">
+            <span class="method ${ep.method}">${ep.method}</span>
+            <code>${escapeHtml(ep.path)}</code>
+            <span class="desc">${escapeHtml(ep.summary)}</span>
+          </div>`;
+        });
+        list.innerHTML = html;
+        list.querySelectorAll('.endpoint-item').forEach((el) =>
+          el.addEventListener('click', () => selectEndpoint(Number(el.dataset.index))),
+        );
+        $('endpointCount').textContent = `${ENDPOINTS.length} 个接口`;
+      }
+
+      function selectEndpoint(index) {
+        apiState.current = index;
+        apiState.values = { ...(ENDPOINTS[index].defaults || {}) };
+        apiState.bodyDirty = false;
+        document.querySelectorAll('.endpoint-item').forEach((el) =>
+          el.classList.toggle('active', Number(el.dataset.index) === index),
+        );
+
+        const ep = ENDPOINTS[index];
+        $('reqMethod').textContent = ep.method;
+        $('reqMethod').className = `method ${ep.method}`;
+        $('reqPath').textContent = ep.path;
+        $('apiSummary').textContent = ep.summary;
+        $('apiAcceptMarkdown').checked = Boolean(ep.acceptMarkdown);
+        $('apiBodyWrap').classList.toggle('hidden', ep.method === 'GET');
+        $('apiHint').textContent = ep.path.includes(':id')
+          ? '把文章 id（或完整 markdownUrl）填进 id 字段即可'
+          : '';
+        renderFields(ep);
+        syncBodyFromFields(ep);
+      }
+
+      function renderFields(ep) {
+        const wrap = $('apiFields');
+        if (!ep.fields.length) {
+          wrap.innerHTML = '<div class="kv">该接口没有参数</div>';
+          return;
+        }
+        wrap.innerHTML = ep.fields
+          .map((name) => {
+            const def = FIELD_DEFS[name];
+            if (!def) return '';
+            const value = apiState.values[name];
+            const id = `fld-${name}`;
+            let input = '';
+            if (def.type === 'bool') {
+              input = `<label class="check"><input type="checkbox" id="${id}" data-field="${name}" ${value === true ? 'checked' : ''} /><span class="kv">${value === true ? 'true' : 'false'}</span></label>`;
+            } else if (def.type === 'select') {
+              const options = def.options
+                .map(([v, label]) => `<option value="${escapeAttr(v)}" ${String(value ?? '') === v ? 'selected' : ''}>${escapeHtml(label)}</option>`)
+                .join('');
+              input = `<select id="${id}" data-field="${name}">${options}</select>`;
+            } else {
+              input = `<input type="${def.type === 'number' ? 'number' : 'text'}" id="${id}" data-field="${name}" value="${escapeAttr(value ?? '')}" placeholder="${escapeAttr(def.placeholder || '')}" />`;
+            }
+            return `<div class="field-row"><label for="${id}">${escapeHtml(def.label)}</label><div>${input}</div></div>`;
+          })
+          .join('');
+
+        wrap.querySelectorAll('[data-field]').forEach((el) => {
+          el.addEventListener('input', () => {
+            const name = el.dataset.field;
+            apiState.values[name] = el.type === 'checkbox' ? el.checked : el.value;
+            if (el.type === 'checkbox') {
+              const span = el.parentElement.querySelector('.kv');
+              if (span) span.textContent = el.checked ? 'true' : 'false';
+            }
+            syncBodyFromFields(ENDPOINTS[apiState.current]);
+          });
+          el.addEventListener('change', () => {
+            const name = el.dataset.field;
+            apiState.values[name] = el.type === 'checkbox' ? el.checked : el.value;
+            syncBodyFromFields(ENDPOINTS[apiState.current]);
+          });
+        });
+      }
+
+      function collectValues(ep) {
+        const out = {};
+        for (const name of ep.fields) {
+          const value = apiState.values[name];
+          if (value === undefined || value === null || value === '') continue;
+          if (FIELD_DEFS[name]?.type === 'number') {
+            const n = Number(value);
+            if (Number.isFinite(n)) out[name] = n;
+            continue;
+          }
+          if (name === 'urls') {
+            out.urls = String(value).split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+            continue;
+          }
+          out[name] = value;
+        }
+        return out;
+      }
+
+      function syncBodyFromFields(ep) {
+        if (ep.method === 'GET' || apiState.bodyDirty) return;
+        const values = collectValues(ep);
+        $('apiBody').value = Object.keys(values).length ? JSON.stringify(values, null, 2) : '';
+      }
+
+      function extractId(raw) {
+        const value = String(raw || '').trim();
+        if (!value) return '';
+        if (/^https?:\/\//i.test(value)) {
+          try {
+            const parts = new URL(value).pathname.split('/').filter(Boolean);
+            const last = parts[parts.length - 1] || '';
+            if (last === 'markdown' || last === 'download') return decodeURIComponent(parts[parts.length - 2] || '');
+            return decodeURIComponent(last);
+          } catch {
+            return value;
+          }
+        }
+        return value;
+      }
+
+      function buildRequest() {
+        const ep = ENDPOINTS[apiState.current];
+        const values = collectValues(ep);
+        let path = ep.path;
+        let body;
+
+        // 路径参数（两种 method 都要处理，否则会把字面量 :id 发出去）
+        if (path.includes(':id')) {
+          const id = extractId(values.id);
+          if (!id) throw new Error('请先填写 id（文章 id 或完整 markdownUrl）');
+          delete values.id;
+          path = path.replace(':id', encodeURIComponent(id));
+        }
+
+        // 图床文件的 ref 可能是 folder 布局下的相对路径（标题/01.jpg），要整段编码成单个路径段
+        if (path.includes(':ref')) {
+          const ref = String(values.ref || '').trim();
+          if (!ref) throw new Error('请先填写 ref（文件名 / hash / hash 前缀 / 相对路径）');
+          delete values.ref;
+          path = path.replace(':ref', encodeURIComponent(ref));
+        }
+
+        if (ep.method === 'GET') {
+          const params = new URLSearchParams();
+          for (const [key, value] of Object.entries(values)) params.append(key, String(value));
+          const qs = params.toString();
+          if (qs) path += `?${qs}`;
+        } else {
+          const raw = $('apiBody').value.trim();
+          body = raw || JSON.stringify(values);
+          try {
+            JSON.parse(body);
+          } catch {
+            throw new Error('请求体不是合法 JSON');
+          }
+        }
+        return { ep, path, body };
+      }
+
+      async function apiSend() {
+        let request;
+        try {
+          request = buildRequest();
+        } catch (err) {
+          setApiStatus(null, err.message);
+          return;
+        }
+        const { ep, path, body } = request;
+        const reqHeaders = headers(ep.method === 'GET' ? {} : { 'content-type': 'application/json' });
+        if ($('apiAcceptMarkdown').checked) reqHeaders.accept = 'text/markdown';
+
+        $('apiSend').disabled = true;
+        setApiStatus(null, '请求中…'); // 清掉上一次的状态码，避免误以为已完成
+        $('apiResponse').textContent = '请求中…';
+        $('apiMediaGrid').innerHTML = '';
+        $('apiPreview').classList.add('hidden');
+        $('apiPreviewBtn').disabled = true;
+        apiState.markdown = '';
+
+        const started = performance.now();
+        let res;
+        let text = '';
+        try {
+          res = await fetch(path, { method: ep.method, headers: reqHeaders, body });
+          text = await res.text();
+        } catch (err) {
+          const ms = Math.round(performance.now() - started);
+          apiState.history.unshift({ method: ep.method, path, status: 0, ms, error: err.message });
+          renderHistory();
+          setApiStatus(0, `网络错误：${err.message}`);
+          $('apiResponse').textContent = String(err);
+          $('apiSend').disabled = false;
+          return;
+        }
+        const ms = Math.round(performance.now() - started);
+        apiState.responseText = text;
+
+        let parsed = null;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          /* 非 JSON（比如 text/markdown） */
+        }
+
+        if (parsed?.data?.markdown) apiState.markdown = parsed.data.markdown;
+        else if ((res.headers.get('content-type') || '').includes('text/markdown')) apiState.markdown = text;
+        $('apiPreviewBtn').disabled = !apiState.markdown;
+
+        const pretty =
+          parsed !== null ? JSON.stringify(parsed, null, 2) : text.length > 200000 ? `${text.slice(0, 200000)}\n…(已截断)` : text;
+        $('apiResponse').textContent = pretty || '(空响应)';
+
+        const extras = [];
+        const articleId = res.headers.get('x-article-id');
+        if (articleId) extras.push(`文章 id: ${decodeURIComponent(articleId)}`);
+        const disposition = res.headers.get('content-disposition');
+        if (disposition) extras.push(disposition);
+        setApiStatus(
+          res.status,
+          `${ms} ms · ${res.headers.get('content-type') || '未知类型'} · ${formatBytes(text.length)}${extras.length ? ' · ' + extras.join(' · ') : ''}`,
+        );
+
+        // 媒体预览
+        const media = parsed?.data?.media || [];
+        if (Array.isArray(media) && media.length) {
+          $('apiMediaGrid').innerHTML = media
+            .slice(0, 12)
+            .map((item) => {
+              const isImage = String(item.mime || '').startsWith('image/');
+              const thumb = isImage
+                ? `<img src="${escapeAttr(item.localUrl)}" alt="" loading="lazy" />`
+                : `<div style="height:110px;display:flex;align-items:center;justify-content:center;color:#9aa3b2">${item.kind === 'video' ? '▶ 视频' : '♪ 音频'}</div>`;
+              return `<figure><a href="${escapeAttr(item.localUrl)}" target="_blank" rel="noreferrer">${thumb}</a>
+                <figcaption>${escapeHtml(item.file || '')}<br />${Math.round((item.bytes || 0) / 1024)} KB</figcaption></figure>`;
+            })
+            .join('');
+        }
+
+        apiState.history.unshift({
+          method: ep.method,
+          path,
+          status: res.status,
+          ms,
+          ok: res.ok,
+          endpointIndex: apiState.current,
+          values: { ...apiState.values },
+          body: ep.method === 'GET' ? '' : $('apiBody').value,
+        });
+        apiState.history = apiState.history.slice(0, 12);
+        renderHistory();
+        $('apiSend').disabled = false;
+      }
+
+      function setApiStatus(status, meta) {
+        const pill = $('apiStatusPill');
+        if (status === null) {
+          pill.classList.add('hidden');
+          pill.textContent = '';
+        } else {
+          pill.classList.remove('hidden');
+          pill.textContent = status === 0 ? '错误' : `HTTP ${status}`;
+          pill.className = `status-pill ${status >= 200 && status < 400 ? 'ok' : 'bad'}`;
+        }
+        $('apiMeta').textContent = meta || '';
+      }
+
+      function renderHistory() {
+        $('apiHistory').innerHTML = apiState.history.length
+          ? apiState.history
+              .map(
+                (item, index) => `<div class="hist-item" data-index="${index}">
+                  <span><span class="method ${item.method}">${item.method}</span> ${escapeHtml(item.path)}</span>
+                  <span class="${item.status >= 200 && item.status < 400 ? 'ok' : 'bad'}">${item.status || 'ERR'} · ${item.ms} ms</span>
+                </div>`,
+              )
+              .join('')
+          : '<div class="kv">还没有请求记录</div>';
+
+        $('apiHistory')
+          .querySelectorAll('.hist-item')
+          .forEach((el) =>
+            el.addEventListener('click', () => {
+              const item = apiState.history[Number(el.dataset.index)];
+              if (!item) return;
+              selectEndpoint(item.endpointIndex);
+              apiState.values = { ...item.values };
+              renderFields(ENDPOINTS[item.endpointIndex]);
+              if (item.body) {
+                $('apiBody').value = item.body;
+                apiState.bodyDirty = true;
+              }
+            }),
+          );
+      }
+
+      function buildCurl() {
+        let request;
+        try {
+          request = buildRequest();
+        } catch (err) {
+          return `# ${err.message}`;
+        }
+        const { ep, path, body } = request;
+        const lines = [`curl -X ${ep.method} '${location.origin}${path}'`];
+        if ($('apiAcceptMarkdown').checked) lines.push(`  -H 'accept: text/markdown'`);
+        if (ep.method !== 'GET') lines.push(`  -H 'content-type: application/json'`);
+        if (token()) lines.push(`  -H 'x-api-token: ${token()}'`);
+        else if (localStorage.getItem('webclip_token_needed') === '1') lines.push(`  -H 'x-api-token: <你的 API_TOKEN>'`);
+        if (body) lines.push(`  -d '${body.replace(/'/g, "'\\''")}'`);
+        return lines.join(' \\\n');
+      }
+
+      function formatBytes(bytes) {
+        const n = Number(bytes) || 0;
+        if (n < 1024) return `${n} B`;
+        if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+        return `${(n / 1024 / 1024).toFixed(2)} MB`;
+      }
+
+      async function copyText(text, button, doneLabel) {
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = button.textContent;
+          button.textContent = doneLabel || '已复制 ✓';
+          setTimeout(() => (button.textContent = original), 1500);
+        } catch {
+          button.textContent = '复制失败（请手动选择）';
+        }
+      }
+
+      /* ---------------- 一键自检 ---------------- */
+
+      function renderSelfCheck(rows, summary) {
+        const el = $('selfCheckResult');
+        if (!rows.length && !summary) {
+          el.innerHTML = '';
+          return;
+        }
+        const icon = { ok: '✔', fail: '✖', warn: '!' };
+        el.innerHTML =
+          (summary ? `<div class="row" style="margin-bottom:8px"><b>${escapeHtml(summary.text)}</b></div>` : '') +
+          `<div class="checklist">${rows
+            .map(
+              (row) => `<div class="check-row ${row.status}">
+                <span>${icon[row.status] || '·'}</span>
+                <span class="t">${escapeHtml(row.name)}</span>
+                <span class="d">${escapeHtml(row.detail || '')}</span>
+                ${row.ms !== undefined ? `<span class="r">${row.ms} ms</span>` : ''}
+              </div>`,
+            )
+            .join('')}</div>`;
+      }
+
+      async function timedFetch(path, options = {}, timeoutMs = 150000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(new Error('超时')), timeoutMs);
+        const started = performance.now();
+        try {
+          const res = await fetch(path, { ...options, signal: controller.signal });
+          const text = await res.text();
+          return { res, text, ms: Math.round(performance.now() - started) };
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function runSelfCheck() {
+        const rows = [];
+        const push = (name, status, detail, ms) => {
+          rows.push({ name, status, detail, ms });
+          renderSelfCheck(rows);
+        };
+        const target = $('selfCheckUrl').value.trim() || 'https://example.com';
+        const engine = $('selfCheckBrowser').checked ? 'browser' : 'fetch';
+        const startedAll = performance.now();
+        $('selfCheckRun').disabled = true;
+        renderSelfCheck([{ name: '准备', status: 'warn', detail: '开始自检…' }]);
+        let articleId = '';
+
+        try {
+          // 1) 健康检查
+          try {
+            const { res, text, ms } = await timedFetch('/healthz', {}, 15000);
+            const data = JSON.parse(text);
+            push(
+              '健康检查',
+              res.ok ? 'ok' : 'fail',
+              res.ok
+                ? `v${data.version} · 运行 ${data.uptimeSec}s · 浏览器${data.browser?.connected ? '已就绪' : '未启动（首次抓取时启动）'} · 并发 ${data.browser?.activeContexts ?? 0}`
+                : `HTTP ${res.status}`,
+              ms,
+            );
+          } catch (err) {
+            push('健康检查', 'fail', `请求失败：${err.message}`);
+          }
+
+          // 2) 统计与鉴权
+          let tokenRequired = false;
+          try {
+            const { res, text, ms } = await timedFetch('/api/stats', { headers: headers() }, 20000);
+            if (res.status === 401) {
+              push('接口鉴权', 'fail', '返回 401：服务端设置了 API_TOKEN，请在"高级选项"里填入 Token', ms);
+            } else {
+              const data = JSON.parse(text);
+              tokenRequired = Boolean(data.data?.config?.apiTokenRequired);
+              push(
+                '统计接口',
+                res.ok ? 'ok' : 'fail',
+                `图床 ${data.data?.media?.files ?? '?'} 个文件 / ${formatBytes(data.data?.media?.bytes || 0)} · 文章 ${data.data?.articles?.total ?? '?'} 篇`,
+                ms,
+              );
+              push(
+                '接口鉴权',
+                tokenRequired ? 'ok' : 'warn',
+                tokenRequired ? '已设置 API_TOKEN（公网部署建议保持）' : '未设置 API_TOKEN，任何人都能调用接口',
+                ms,
+              );
+            }
+          } catch (err) {
+            push('统计接口', 'fail', `请求失败：${err.message}`);
+          }
+
+          // 3) 广告规则
+          try {
+            const { res, text, ms } = await timedFetch('/api/rules', { headers: headers() }, 15000);
+            const data = JSON.parse(text);
+            push(
+              '广告规则',
+              data.data?.disabled ? 'warn' : res.ok ? 'ok' : 'fail',
+              data.data?.disabled
+                ? '规则被 ADBLOCK_DISABLE=1 关闭'
+                : `${data.data?.hostPatterns ?? '?'} 条域名规则 · ${data.data?.removeSelectors ?? '?'} 条 DOM 规则`,
+              ms,
+            );
+          } catch (err) {
+            push('广告规则', 'warn', `跳过：${err.message}`);
+          }
+
+          // 4) 真实抓取（可选）
+          if ($('selfCheckReal').checked) {
+            try {
+              const payload = {
+                url: target,
+                engine,
+                imageMode: 'local',
+                returnMarkdown: true,
+                store: true,
+                maxMediaFiles: 3,
+              };
+              const { res, text, ms } = await timedFetch(
+                '/api/convert',
+                { method: 'POST', headers: headers({ 'content-type': 'application/json' }), body: JSON.stringify(payload) },
+                180000,
+              );
+              const data = JSON.parse(text);
+              if (!res.ok) {
+                push('抓取转换', 'fail', `HTTP ${res.status}：${data.error?.message || text.slice(0, 160)}`, ms);
+              } else {
+                const d = data.data;
+                articleId = d.id;
+                const mediaStats = d.stats?.media || {};
+                push(
+                  '抓取转换',
+                  d.markdown?.length ? 'ok' : 'warn',
+                  `${d.title?.slice(0, 40)} · ${d.stats?.words ?? '?'} 字 · 媒体 ${d.media?.length ?? 0}（下载 ${mediaStats.saved ?? 0}/缓存 ${mediaStats.reusedFromCache ?? 0}）· 拦截广告请求 ${d.stats?.adsBlocked ?? 0}`,
+                  ms,
+                );
+
+                // 5) Markdown 直链（用当前访问地址测，避免 PUBLIC_BASE_URL 指向 localhost 时误判）
+                if (d.markdownUrl) {
+                  const mdUrl = d.markdownUrl.replace(/^https?:\/\/[^/]+/, location.origin);
+                  const mdRes = await timedFetch(mdUrl, { headers: headers() }, 30000);
+                  const type = mdRes.res.headers.get('content-type') || '';
+                  push(
+                    'Markdown 直链',
+                    mdRes.res.ok ? 'ok' : 'fail',
+                    mdRes.res.ok ? `${type} · ${formatBytes(mdRes.text.length)}` : `HTTP ${mdRes.res.status}（${mdUrl}）`,
+                    mdRes.ms,
+                  );
+                }
+
+                // 6) 图床直链（不需要 Token）
+                const firstMedia = (d.media || [])[0];
+                if (firstMedia) {
+                  // 用当前访问地址测，避免 PUBLIC_BASE_URL 指向 localhost 时误报
+                  const origin = new URL(firstMedia.localUrl).origin;
+                  const mediaUrl = firstMedia.localUrl.replace(/^https?:\/\/[^/]+/, location.origin);
+                  const mediaRes = await timedFetch(mediaUrl, {}, 60000);
+                  push(
+                    '图床直链',
+                    mediaRes.res.ok ? 'ok' : 'fail',
+                    mediaRes.res.ok
+                      ? `${firstMedia.kind} · ${mediaRes.res.headers.get('content-type')} · ${formatBytes(mediaRes.text.length)} · 无需 Token 即可访问`
+                      : `HTTP ${mediaRes.res.status}（${mediaUrl}）`,
+                    mediaRes.ms,
+                  );
+                  if (origin !== location.origin) {
+                    push(
+                      'PUBLIC_BASE_URL',
+                      'warn',
+                      `图床链接前缀是 ${origin}，与当前访问地址不一致：写进 Markdown 的图片链接在别的设备上可能打不开`,
+                    );
+                  }
+                } else {
+                  push('图床直链', 'warn', '该页面没有媒体，跳过（可换一个含图/视频的网址再试）');
+                }
+
+                for (const warning of d.warnings || []) push('抓取告警', 'warn', warning);
+                for (const failure of (d.mediaFailures || []).slice(0, 3)) {
+                  push('媒体失败', 'warn', `${failure.reason} · ${String(failure.url).slice(0, 70)}`);
+                }
+              }
+            } catch (err) {
+              push('抓取转换', 'fail', `请求失败：${err.message}`);
+            }
+          } else {
+            push('抓取转换', 'warn', '已跳过（勾选"包含真实站点抓取"可验证无头浏览器与图床）');
+          }
+
+          // 7) 清理自检产生的文章
+          if (articleId) {
+            try {
+              const del = await timedFetch(`/api/articles/${encodeURIComponent(articleId)}`, { method: 'DELETE', headers: headers() }, 20000);
+              push('清理自检数据', del.res.ok ? 'ok' : 'warn', del.res.ok ? '已删除自检产生的文章（图床文件保留）' : `HTTP ${del.res.status}`, del.ms);
+            } catch (err) {
+              push('清理自检数据', 'warn', `跳过：${err.message}`);
+            }
+          }
+        } finally {
+          const failed = rows.filter((r) => r.status === 'fail').length;
+          const warned = rows.filter((r) => r.status === 'warn').length;
+          const total = Math.round(performance.now() - startedAll);
+          renderSelfCheck(rows, {
+            text: failed
+              ? `自检结束：${failed} 项失败，${warned} 项警告（共 ${rows.length} 项，${total} ms）`
+              : `自检通过：${rows.length - warned} 项正常${warned ? `，${warned} 项警告` : ''}（${total} ms）`,
+          });
+          $('selfCheckRun').disabled = false;
+        }
+      }
+
+      function selfCheckReport() {
+        const rows = [...document.querySelectorAll('#selfCheckResult .check-row')].map((el) => ({
+          status: el.classList.contains('ok') ? 'OK' : el.classList.contains('fail') ? 'FAIL' : 'WARN',
+          text: el.textContent.replace(/\s+/g, ' ').trim(),
+        }));
+        if (!rows.length) return '（还没有自检结果）';
+        return [
+          `WebClip 自检报告 · ${new Date().toLocaleString('zh-CN')}`,
+          `页面地址: ${location.origin}`,
+          ...rows.map((r) => `[${r.status}] ${r.text}`),
+        ].join('\n');
+      }
+
+      /* ---------------- 绑定 ---------------- */
+      renderEndpointList();
+      selectEndpoint(0);
+      renderHistory();
+
+      $('apiSend').addEventListener('click', apiSend);
+      $('apiCurl').addEventListener('click', (e) => copyText(buildCurl(), e.currentTarget, '已复制 curl ✓'));
+      $('apiCopyResponse').addEventListener('click', (e) =>
+        copyText(apiState.responseText || '', e.currentTarget, '已复制响应 ✓'),
+      );
+      $('apiPreviewBtn').addEventListener('click', () => {
+        if (!apiState.markdown) return;
+        const box = $('apiPreview');
+        box.innerHTML = renderMarkdown(apiState.markdown);
+        box.classList.toggle('hidden');
+      });
+      $('apiBody').addEventListener('input', () => {
+        apiState.bodyDirty = true;
+      });
+      $('apiFillRecent').addEventListener('click', async () => {
+        try {
+          const json = await api('/api/articles?limit=1');
+          const id = json?.data?.items?.[0]?.id;
+          if (!id) {
+            $('apiHint').textContent = '还没有任何文章，先跑一次抓取';
+            return;
+          }
+          apiState.values.id = id;
+          renderFields(ENDPOINTS[apiState.current]);
+          syncBodyFromFields(ENDPOINTS[apiState.current]);
+          $('apiHint').textContent = `已填入：${id}`;
+        } catch (err) {
+          $('apiHint').textContent = `读取失败：${err.message}`;
+        }
+      });
+      $('apiClearHistory').addEventListener('click', () => {
+        apiState.history = [];
+        renderHistory();
+      });
+      $('selfCheckRun').addEventListener('click', runSelfCheck);
+      $('apiReport').addEventListener('click', (e) => copyText(selfCheckReport(), e.currentTarget, '已复制报告 ✓'));
+      document.querySelector('.viewtabs button[data-view="api"]').addEventListener('click', () => {
+        if (!$('selfCheckResult').innerHTML) {
+          renderSelfCheck([{ name: '提示', status: 'warn', detail: '点右侧"开始自检"验证这套部署：健康检查 → 鉴权 → 抓取 → Markdown 直链 → 图床直链' }]);
+        }
+      });
+
+      switchView(localStorage.getItem('webclip_view') === 'api' ? 'api' : localStorage.getItem('webclip_view') === 'browse' ? 'browse' : 'clip', { updateHash: false });
+      applyHash();
+
+      checkHealth();
+      loadRecent();
+      setInterval(checkHealth, 30000);
+
+    </script>
+  </body>
+</html>

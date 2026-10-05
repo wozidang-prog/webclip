@@ -1,0 +1,112 @@
+services:
+  webclip:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: webclip:latest
+    container_name: webclip
+    restart: unless-stopped
+    init: true # 让 init 进程回收 Chromium 子进程，避免僵尸进程
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      # Markdown 中图片链接的前缀：必须填外部可访问的地址（域名或 IP:端口）
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:3000}"
+      # 留空 = 不校验；填了之后 /api/* 需要 x-api-token 或 Authorization: Bearer
+      API_TOKEN: "${API_TOKEN:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+
+      # ---- NAS / 权限（出现 EACCES: mkdir '/data/media' 时看这里）----
+      # 容器以 root 启动，按 PUID:PGID 修好 /data 属主后再降权运行。
+      # 群晖常见 1026:100，威联通常见 1000:1000，用 `ls -nd <目录>` 查宿主机属主。
+      PUID: "${PUID:-1000}"
+      PGID: "${PGID:-1000}"
+      # 兜底：ACL/NFS 导致 chown 失败时，用 root 直接跑
+      RUN_AS_ROOT: "${RUN_AS_ROOT:-false}"
+      # 设为 false 则完全不动你的目录属主
+      CHOWN_ON_START: "${CHOWN_ON_START:-true}"
+
+      # 下载文件自动命名（默认 日期-标题）
+      FILENAME_TEMPLATE: "${FILENAME_TEMPLATE:-{date}-{title}}"
+
+      # 媒体目录布局：folder（默认，media/<站点域名>/<标题>/01.jpg 按顺序编号）
+      #              flat（内容寻址去重，media/<站点域名>/<sha256>.jpg，最省磁盘）
+      MEDIA_LAYOUT: "${MEDIA_LAYOUT:-folder}"
+      # 媒体是否按网站分一层目录（media/douyin.com/…）；设 false 退回旧的扁平结构
+      MEDIA_GROUP_BY_SITE: "${MEDIA_GROUP_BY_SITE:-true}"
+      # 网址记录 + 正文副本（SQLite）：重复抓取同一网址且正文没变时直接复用，不再下载媒体
+      DATABASE_ENABLED: "${DATABASE_ENABLED:-true}"
+      SKIP_UNCHANGED_REFRESH: "${SKIP_UNCHANGED_REFRESH:-true}"
+
+      # 容器内通常需要关闭 Chromium 沙箱（见 README 安全说明）
+      CHROMIUM_NO_SANDBOX: "true"
+      # 镜像里装了真实 Google Chrome：自带的 Chromium 没有 H.264/AAC，
+      # 抖音这类站点的播放器探测失败就不起播（也就抓不到视频流）
+      BROWSER_CHANNEL: "${BROWSER_CHANNEL:-chrome}"
+      # 有头模式：设成 false 会由入口脚本自动拉起 Xvfb（镜像内已装），
+      # 抖音这类站点的风控盯着无头浏览器时，有头 + 虚拟显示通常能过。
+      BROWSER_HEADLESS: "${BROWSER_HEADLESS:-true}"
+      # 需要登录才能看的站点：把浏览器里的 Cookie 字符串配进来（留空=不注入）
+      DOUYIN_COOKIE: "${DOUYIN_COOKIE:-}"
+      XIAOHONGSHU_COOKIE: "${XIAOHONGSHU_COOKIE:-}"
+      SITE_COOKIES: "${SITE_COOKIES:-}"
+      # 小红书自建解析器（如 XHS-Downloader 的 HTTP API）：
+      # 填了就把小红书链接优先交给它解析（一次拿到标题/正文/图片视频直链，不需要页面登录态）。
+      # 例：http://xhs-parser.example.com:5556/xhs/detail
+      XIAOHONGSHU_API: "${XIAOHONGSHU_API:-}"
+      XIAOHONGSHU_API_TIMEOUT_MS: "${XIAOHONGSHU_API_TIMEOUT_MS:-30000}"
+      # 配了解析器时小红书是否「只走解析器、不抓网页」（默认 true）：
+      # 网页端未登录/被风控只会返回「安全限制」页面，抓它没内容还容易招验证
+      XIAOHONGSHU_PARSER_ONLY: "${XIAOHONGSHU_PARSER_ONLY:-true}"
+      # 「只下载视频图片」模式（mediaOnly=1）的素材根目录：默认与 /data 同级，
+      # 记得在下面 volumes 里也把它挂出来，否则文件会随容器一起消失。
+      MEDIA_ONLY_DIR: "${MEDIA_ONLY_DIR:-/media-only}"
+      # 抓完发通知：WEBHOOK_URL 留空则不发；格式 json/text/slack/synology/feishu/dingtalk/wecom
+      WEBHOOK_URL: "${WEBHOOK_URL:-}"
+      WEBHOOK_FORMAT: "${WEBHOOK_FORMAT:-json}"
+      WEBHOOK_HEADERS: "${WEBHOOK_HEADERS:-}"
+      # 群晖/NAS 的 webapi 常用自签名证书：设 false 才发得出去（只影响 webhook 请求）
+      WEBHOOK_TLS_VERIFY: "${WEBHOOK_TLS_VERIFY:-true}"
+      # 消息超过平台上限（群晖约 2000 字）会自动分条：分条间隔毫秒数、单条字数上限（0=平台默认）
+      WEBHOOK_PART_DELAY_MS: "${WEBHOOK_PART_DELAY_MS:-1500}"
+      WEBHOOK_MAX_CHARS: "${WEBHOOK_MAX_CHARS:-0}"
+      CONVERT_CONCURRENCY: "3"
+      # 图床容量：图片 25MiB / 视频 256MiB 上限，总容量 5GiB
+      MAX_MEDIA_TOTAL_BYTES: "5368709120"
+      MAX_MEDIA_FILE_BYTES: "26214400"
+      MAX_VIDEO_BYTES: "268435456"
+      PAGE_AUTO_SCROLL: "true"
+      RATE_LIMIT_PER_MINUTE: "0"
+      ALLOW_PRIVATE_NETWORK: "false"
+      TZ: "Asia/Shanghai"
+    volumes:
+      # 方案 A：命名卷（不涉及宿主机权限，最省事）
+      - webclip-data:/data
+      # 「只下载视频图片」模式的素材目录（与 /data 同级，单独一个卷方便同步/清理）
+      - webclip-media-only:/media-only
+      # 方案 B：NAS 上映射到共享文件夹（把上面两行注释掉，改用下面两行；
+      #         目录属主不是 1000:1000 时按需设置 PUID/PGID）
+      # - /volume1/docker/webclip/data:/data
+      # - /volume1/docker/webclip/media-only:/media-only
+    # Chromium 需要较大的 /dev/shm，否则大页面容易崩
+    shm_size: "1gb"
+    # 容器里解析不了 DDNS 域名（webhook 报 ENOTFOUND）时，用这两种办法之一：
+    # extra_hosts:
+    #   - "你的域名.sbs:192.168.1.10"   # 直接把域名指到 NAS 的局域网 IP
+    # dns:
+    #   - 223.5.5.5
+    #   - 1.1.1.1
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+volumes:
+  webclip-data:
+  webclip-media-only:

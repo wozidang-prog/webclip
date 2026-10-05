@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+data
+.tmp-test
+.npm-cache
+*.log
+test
+README.md
+docker-compose.yml
+Dockerfile
+.dockerignore

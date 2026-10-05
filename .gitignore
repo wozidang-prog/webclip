@@ -1,0 +1,11 @@
+node_modules/
+data/
+media-only/
+.tmp-test/
+.tmp-live/
+.npm-cache/
+*.log
+.env
+.env.local
+.DS_Store
+BUILD_TIME

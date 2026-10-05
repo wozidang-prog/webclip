@@ -1,0 +1,18 @@
+# 统一用 LF 落库并检出。
+# 关键：docker/entrypoint.sh 这类脚本进 Linux 容器必须是 LF，否则 shebang 直接报错；
+# 统一之后在 Windows 上也不会因为 core.autocrlf 把整个仓库改得面目全非。
+* text=auto eol=lf
+
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.avif binary
+*.woff binary
+*.woff2 binary
+*.mp4  binary
